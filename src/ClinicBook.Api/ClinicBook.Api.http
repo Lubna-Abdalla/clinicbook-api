@@ -1,6 +1,117 @@
 @ClinicBook.Api_HostAddress = http://localhost:5191
 
-GET {{ClinicBook.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### 1. Log in as the seeded admin (copy "token" from the response into @adminToken below)
+### Use the email/password you put in User Secrets as SeedAdmin:Email / SeedAdmin:Password.
+POST {{ClinicBook.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
 
-###
+{
+  "email": "admin@clinicbook.local",
+  "password": "<your-SeedAdmin-password>"
+}
+
+@adminToken = paste-the-admin-token-here
+@doctorToken = paste-the-doctor-token-here
+@patientToken = paste-the-patient-token-here
+
+### 2. Public: list specialties
+GET {{ClinicBook.Api_HostAddress}}/api/specialties
+
+### 3. Admin: create a doctor (this also creates their login account)
+POST {{ClinicBook.Api_HostAddress}}/api/doctors
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "fullName": "Dr Mona Salem",
+  "email": "mona.salem@clinicbook.local",
+  "password": "Doctor123!",
+  "specialtyId": 2,
+  "bio": "Cardiologist with an interest in preventive care.",
+  "consultationFee": 300.00
+}
+
+### 4. Log in as that doctor
+POST {{ClinicBook.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "mona.salem@clinicbook.local",
+  "password": "Doctor123!"
+}
+
+### 5. Doctor: add a recurring weekly working window (0 = Sunday ... 6 = Saturday)
+POST {{ClinicBook.Api_HostAddress}}/api/doctors/1/schedules
+Content-Type: application/json
+Authorization: Bearer {{doctorToken}}
+
+{
+  "dayOfWeek": 1,
+  "startTime": "09:00:00",
+  "endTime": "12:00:00",
+  "slotMinutes": 30
+}
+
+### 6. Public: the doctor's weekly schedule
+GET {{ClinicBook.Api_HostAddress}}/api/doctors/1/schedules
+
+### 7. Public: free slots on a date (must be a date with a schedule, e.g. a Monday)
+GET {{ClinicBook.Api_HostAddress}}/api/doctors/1/available-slots?date=2026-10-05
+
+### 8. Register as a patient
+POST {{ClinicBook.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Sara Ali",
+  "email": "sara.ali@example.com",
+  "password": "Patient123!",
+  "dateOfBirth": "1995-04-17",
+  "phoneNumber": "0123456789"
+}
+
+### 9. Patient: book one of the free slots
+POST {{ClinicBook.Api_HostAddress}}/api/appointments
+Content-Type: application/json
+Authorization: Bearer {{patientToken}}
+
+{
+  "doctorId": 1,
+  "startsAt": "2026-10-05T09:00:00",
+  "reason": "Chest pain for two days"
+}
+
+### 10. Booking the same slot again returns 409 Conflict
+POST {{ClinicBook.Api_HostAddress}}/api/appointments
+Content-Type: application/json
+Authorization: Bearer {{patientToken}}
+
+{
+  "doctorId": 1,
+  "startsAt": "2026-10-05T09:00:00"
+}
+
+### 11. My appointments (works for both patients and doctors)
+GET {{ClinicBook.Api_HostAddress}}/api/appointments/me
+Authorization: Bearer {{patientToken}}
+
+### 12. Cancel an appointment (frees the slot, keeps the record)
+POST {{ClinicBook.Api_HostAddress}}/api/appointments/1/cancel
+Authorization: Bearer {{patientToken}}
+
+### 13. Doctor: complete a visit and store notes
+POST {{ClinicBook.Api_HostAddress}}/api/appointments/2/complete
+Content-Type: application/json
+Authorization: Bearer {{doctorToken}}
+
+{
+  "doctorNotes": "Prescribed rest for two days."
+}
+
+### 14. Doctor: patient did not turn up
+POST {{ClinicBook.Api_HostAddress}}/api/appointments/2/no-show
+Authorization: Bearer {{doctorToken}}
+
+### 15. Who am I?
+GET {{ClinicBook.Api_HostAddress}}/api/auth/me
+Authorization: Bearer {{patientToken}}
